@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Riesgo Respiratorio Bogotá</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4f8; }
+
+    header {
+      background: #1a2f4e;
+      color: white;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      z-index: 1000;
+      position: relative;
+    }
+    header h1 { font-size: 18px; font-weight: 600; }
+    header p  { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+
+    #app { display: flex; height: calc(100vh - 56px); }
+
+    #sidebar {
+      width: 300px;
+      min-width: 300px;
+      background: white;
+      overflow-y: auto;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+      z-index: 500;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #search-box {
+      padding: 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    #search-box label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    #search-input {
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      transition: border 0.2s;
+    }
+    #search-input:focus { border-color: #3182ce; }
+
+    #station-list { flex: 1; overflow-y: auto; }
+    .station-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f0f4f8;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.15s;
+    }
+    .station-item:hover { background: #f7fafc; }
+    .station-item.active { background: #ebf8ff; }
+    .dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      border: 2px solid rgba(0,0,0,0.15);
+    }
+    .station-name { font-size: 13px; font-weight: 500; color: #2d3748; }
+    .station-cat  { font-size: 11px; color: #718096; margin-top: 2px; }
+
+    #detail-panel {
+      padding: 16px;
+      border-top: 2px solid #e2e8f0;
+      background: #f7fafc;
+      display: none;
+    }
+    #detail-panel h3 { font-size: 14px; color: #1a2f4e; margin-bottom: 8px; }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 4px 0;
+      border-bottom: 1px solid #e2e8f0;
+      color: #4a5568;
+    }
+    .detail-row:last-child { border: none; }
+    .cat-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+      margin-bottom: 10px;
+    }
+
+    #map { flex: 1; }
+
+    #legend {
+      position: absolute;
+      bottom: 30px;
+      right: 20px;
+      z-index: 1000;
+      background: white;
+      padding: 14px 18px;
+      border-radius: 10px;
+      box-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+      font-size: 12px;
+      pointer-events: none;
+    }
+    #legend b { font-size: 13px; display: block; margin-bottom: 8px; color: #1a2f4e; }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+    .legend-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,0,0,0.2);
+    }
+    #legend small { display: block; margin-top: 8px; color: #999; font-size: 10px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🌿 Riesgo Respiratorio — Bogotá D.C.</h1>
+    <p>Predicción de categoría ICA por estación RMCAB · Modelo Random Forest · Datos 2024–2025</p>
+  </div>
+</header>
+
+<div id="app">
+  <div id="sidebar">
+    <div id="search-box">
+      <label>Buscar estación</label>
+      <input type="text" id="search-input" placeholder="Ej: Kennedy, Suba, Tunal...">
+    </div>
+    <div id="station-list"></div>
+    <div id="detail-panel">
+      <h3 id="detail-name"></h3>
+      <span id="detail-badge" class="cat-badge"></span>
+      <div class="detail-row"><span>ICA promedio histórico</span><span id="d-ica"></span></div>
+      <div class="detail-row"><span>PM₂.₅ (Z-score prom.)</span><span id="d-pm25"></span></div>
+      <div class="detail-row"><span>PM₁₀ (Z-score prom.)</span><span id="d-pm10"></span></div>
+      <div class="detail-row"><span>O₃ (Z-score prom.)</span><span id="d-ozono"></span></div>
+      <div class="detail-row"><span>NO₂ (Z-score prom.)</span><span id="d-no2"></span></div>
+      <div class="detail-row"><span>CO (Z-score prom.)</span><span id="d-co"></span></div>
+      <div class="detail-row"><span>SO₂ (Z-score prom.)</span><span id="d-so2"></span></div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+</div>
+
+<div id="legend">
+  <b>Categoría ICA</b>
+  <div class="legend-item"><div class="legend-dot" style="background:#2ecc71"></div> Buena (0–50)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f1c40f"></div> Aceptable (51–100)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#e67e22"></div> D. Grupos Sensibles (101–150)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#e74c3c"></div> Dañina (151–200)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#8e44ad"></div> Muy dañina (&gt;200)</div>
+  <small>Predicción: Random Forest<br>Fuente: RMCAB 2024–2025</small>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="data.js"></script>
+<script>
+  // Mapa restringido a Bogotá
+  const bogotaBounds = L.latLngBounds(
+    L.latLng(4.45, -74.23),
+    L.latLng(4.84, -73.99)
+  );
+
+  const map = L.map('map', {
+    center: [4.6097, -74.0817],
+    zoom: 11,
+    minZoom: 11,
+    maxZoom: 16,
+    maxBounds: bogotaBounds,
+    maxBoundsViscosity: 1.0
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CartoDB',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  const markers = {};
+  let activeItem = null;
+
+  function showDetail(e) {
+    const panel = document.getElementById('detail-panel');
+    panel.style.display = 'block';
+    document.getElementById('detail-name').textContent = e.nombre;
+    const badge = document.getElementById('detail-badge');
+    badge.textContent = e.cat_nombre;
+    badge.style.background = e.color;
+    document.getElementById('d-ica').textContent   = e.ica_promedio;
+    document.getElementById('d-pm25').textContent  = e.PM25;
+    document.getElementById('d-pm10').textContent  = e.PM10;
+    document.getElementById('d-ozono').textContent = e.OZONO;
+    document.getElementById('d-no2').textContent   = e.NO2;
+    document.getElementById('d-co').textContent    = e.CO;
+    document.getElementById('d-so2').textContent   = e.SO2;
+  }
+
+  function flyTo(e) {
+    map.flyTo([e.lat, e.lon], 14, { duration: 1.2 });
+    setTimeout(() => markers[e.id].openPopup(), 1300);
+  }
+
+  function selectStation(e, itemEl) {
+    if (activeItem) activeItem.classList.remove('active');
+    itemEl.classList.add('active');
+    activeItem = itemEl;
+    showDetail(e);
+    flyTo(e);
+  }
+
+  // Renderizar lista y marcadores
+  const list = document.getElementById('station-list');
+
+  estaciones.forEach(e => {
+    // Marcador
+    const marker = L.circleMarker([e.lat, e.lon], {
+      radius: 13,
+      fillColor: e.color,
+      color: 'white',
+      weight: 2.5,
+      fillOpacity: 0.9
+    }).addTo(map);
+
+    marker.bindPopup(`
+      <div style="font-family:Arial;font-size:13px;min-width:180px">
+        <b style="color:#1a2f4e">${e.nombre}</b><br>
+        <span style="color:${e.color};font-weight:600">● ${e.cat_nombre}</span><br>
+        <span style="color:#666;font-size:11px">ICA promedio: ${e.ica_promedio}</span>
+      </div>
+    `);
+    marker.bindTooltip(e.nombre, { direction: 'top' });
+    markers[e.id] = marker;
+
+    // Item en lista
+    const item = document.createElement('div');
+    item.className = 'station-item';
+    item.dataset.nombre = e.nombre.toLowerCase();
+    item.innerHTML = `
+      <div class="dot" style="background:${e.color}"></div>
+      <div>
+        <div class="station-name">${e.nombre}</div>
+        <div class="station-cat">${e.cat_nombre}</div>
+      </div>
+    `;
+    item.addEventListener('click', () => selectStation(e, item));
+    list.appendChild(item);
+  });
+
+  // Buscador
+  document.getElementById('search-input').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.station-item').forEach(item => {
+      item.style.display = item.dataset.nombre.includes(q) ? 'flex' : 'none';
+    });
+  });
+</script>
+</body>
+</html>
