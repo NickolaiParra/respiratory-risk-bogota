@@ -1,6 +1,6 @@
 # Respiratory Risk Bogotá
 
-Predictive analysis of respiratory disease propensity in Bogotá D.C. using air quality data from the RMCAB monitoring network, machine learning models (Random Forest, XGBoost), and SHAP interpretability.
+Predictive analysis of respiratory risk in Bogotá D.C. using air quality data from the RMCAB monitoring network, machine learning models (Random Forest, XGBoost), and SHAP interpretability.
 
 ## Live Demo
 
